@@ -1,5 +1,5 @@
 // USB threat statistics by drive letter (not "C:\"").
-// A single event is taken per device.
+// A single event (the latest) is taken per device.
 AlertInfo
 | where Timestamp > ago(180d)
   and DetectionSource in ("Antivirus", "EDR")
