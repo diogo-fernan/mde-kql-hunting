@@ -1,0 +1,14 @@
+// Collects all devices where a list of accounts have logged in to.
+let acc = dynamic([
+  "<acc>"  // this lists needs to be populated
+]);
+DeviceInfo
+| where Timestamp > ago(180d)
+| mv-expand Username = parse_json(LoggedOnUsers)
+| extend Username = tolower(tostring(Username.UserName))
+| where Username in (acc)
+| distinct DeviceName, Username
+| summarize Devices=make_list(DeviceName), Count=dcount(DeviceName) by Username
+// | summarize Count=dcount(DeviceName) by Username //, OnboardingStatus, DeviceType, MachineGroup
+| project Username, Count, Devices
+| sort by Username asc;
