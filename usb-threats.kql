@@ -1,0 +1,17 @@
+// USB threat statistics by drive letter (not "C:\"").
+// A single event is taken per device.
+AlertInfo
+| where Timestamp > ago(180d)
+  and DetectionSource in ("Antivirus", "EDR")
+| join AlertEvidence on AlertId
+| where isnotempty(FolderPath) and FolderPath !startswith @"C:\"  // external USB devices
+| extend AdditionalFields = parse_json(AdditionalFields)
+| extend DeviceName = iff(isempty(AdditionalFields.Host), AdditionalFields.HostName, AdditionalFields.Host.HostName)
+| extend MachineId = iff(isempty(AdditionalFields.Host), AdditionalFields.MachineId, AdditionalFields.Host.MachineId)
+| extend DriveLetter = toupper(tostring(split(FolderPath, @"\")[0]))
+// | extend Malware = tostring(split(Title, @"'")[1])  // malware name
+| where DriveLetter endswith ":"  // filter out edge cases
+| summarize arg_max(Timestamp, *) by tostring(DeviceName)
+| summarize Total = count(DriveLetter) by DriveLetter
+| sort by Total
+| render piechart;
