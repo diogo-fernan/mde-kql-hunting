@@ -1,0 +1,11 @@
+// Parse RemoteURL and match against a list of domain names.
+let domains = dynamic([
+  "<dom1.tld>",
+  "<dom2.tld>"
+]);
+search in (DeviceNetworkEvents)
+  Timestamp > ago(180d)
+| where
+  // InitiatingProcessFileName == "outlook.exe"
+  case(RemoteUrl contains "//", parse_url(RemoteUrl).Host, RemoteUrl) has_any (domains)
+| sort by Timestamp desc;
