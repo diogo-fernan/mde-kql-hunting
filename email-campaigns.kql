@@ -1,0 +1,34 @@
+// Scope malicious email campaigns based on sender, subject, domain name or URLs
+// embedded in the messages.
+let senders = dynamic([
+  "<sender1>",
+  "<sender2>"
+]);
+let subjs = dynamic([
+  "<subj1>",
+  "<subj2>"
+]);
+let domains = dynamic([
+  "<dom1>",
+  "<dom2>"
+]);
+let urls = dynamic([
+  "<url1>",
+  "<url2>"
+]);
+EmailEvents
+| where Timestamp > ago(32d)
+| join (EmailUrlInfo) on $left.NetworkMessageId == $right.NetworkMessageId
+| where (
+    (   // inbound messages and replies with specific subjects
+        (SenderFromAddress in (senders) or RecipientEmailAddress in (senders))
+        and Subject in (subjs)
+    )
+    or UrlDomain has_any (domains)  // both inbound messages and replies with malicious domains
+    or Url has_any (urls)  // both inbound messages and replies with malicious URLs
+  )
+// | summarize Total=count() by UrlDomain
+sort by Total desc;
+// | summarize arg_max(RecipientEmailAddress, *) by RecipientEmailAddress
+| project Timestamp, SenderFromAddress, RecipientEmailAddress, Subject, UrlDomain, Url, DeliveryAction, ThreatTypes, ThreatNames, DetectionMethods
+| sort by Timestamp desc;
