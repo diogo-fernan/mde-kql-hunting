@@ -1,0 +1,21 @@
+// Search for any hits on hash values.
+let md5 = dynamic([
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000"
+]);
+let sha1 = dynamic([
+  "0000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000"
+]);
+let sha256 = dynamic([
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000"
+]);
+union kind=outer DeviceFileEvents, DeviceProcessEvents, DeviceRegistryEvents, DeviceLogonEvents, DeviceImageLoadEvents, DeviceEvents
+| where Timestamp > ago(180d) and
+  (
+    (MD5 in~(md5) or InitiatingProcessMD5 in~(md5)) or
+    (SHA1 in~(sha1) or InitiatingProcessSHA1 in~(sha1)) or
+    (SHA256 in~(sha256) or InitiatingProcessSHA256 in~(sha256))
+  )
+| sort by Timestamp;
