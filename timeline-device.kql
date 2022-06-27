@@ -1,0 +1,46 @@
+// Timeline sliced around a particular timestamp for a particular device ID.
+// This query removes events related with well-known endpoint agents that
+// tend to make analysis difficult. More can be added as seen fit.
+// It also combines particular column names such as file paths and file names.
+// The query requires the first three variables to be set.
+let deviceid = "0000000000000000000000000000000000000000";
+let timestamp = datetime(1970-01-01T00:00:00Z);  // Zulu time = UTC
+let timeoffset = 30m;
+let concat = (prefix:string, suffix:string, character:string) {
+  let str=strcat(prefix, character, suffix);
+  iff(prefix endswith suffix, prefix, iff(str == character, "", str));  // edge cases
+};
+let backslash = (prefix:string, suffix:string) { concat(prefix, suffix, @"\"); };
+let colon = (prefix:string, suffix:string) { concat(prefix, suffix, @":") };
+search in (  // Device* should work too
+  DeviceEvents,
+  DeviceFileEvents,
+  DeviceImageLoadEvents,
+  DeviceLogonEvents
+  DeviceNetworkEvents,
+  DeviceProcessEvents,
+  DeviceRegistryEvents,
+)  // all device tables
+  DeviceId == deviceid
+| where Timestamp > ago(180d)
+  and Timestamp between ((timestamp - timeoffset) .. (timestamp + timeoffset))
+| extend Account=backslash(AccountDomain, AccountName),
+  ProcessAccount=backslash(InitiatingProcessAccountDomain, InitiatingProcessAccountName),
+  Process=backslash(InitiatingProcessFolderPath, InitiatingProcessFileName),
+  File=backslash(FolderPath, FileName),
+  Source=colon(LocalIP, LocalPort), Destination=colon(RemoteIP, RemotePort)
+| where Process !contains @"\AppData\Local\Microsoft\Teams\"
+  and Process !startswith @"c:\program files\windows defender advanced threat protection\"
+  and Process !startswith @"c:\programdata\microsoft\windows defender\"
+  and not (InitiatingProcessParentFileName == "SenseIR.exe" and ActionType == "NtAllocateVirtualMemoryApiCall")
+| extend Pivot = iff(Timestamp == timestamp, "Pivot", iff(Timestamp < timestamp, "Before", "After"))
+| project-reorder Pivot
+| project
+  Timestamp, Pivot,  // time
+  $table, Event=ActionType,  // event
+  Account, LogonType, ProcessAccount,  // account
+  ParentProcess=InitiatingProcessParentFileName, PPID=InitiatingProcessParentId, Process, PID=InitiatingProcessId, ProcessCommandLine=InitiatingProcessCommandLine, ChildCommandLine=ProcessCommandLine,  // process
+  File, Source, Protocol, Destination, RemoteUrl,  // file and network
+  Key=RegistryKey, KeyValue=RegistryValueName, KeyData=RegistryValueData, PrevKey=PreviousRegistryKey, PrevKeyValue=PreviousRegistryValueName, PrevKeyData=PreviousRegistryValueData,  // registry
+  AdditionalFields
+| sort by Timestamp desc;
