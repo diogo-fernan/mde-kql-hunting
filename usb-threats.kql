@@ -1,4 +1,4 @@
-// USB threat statistics by drive letter (not "C:\"").
+// USB threat statistics by drive letter (not "C:\").
 // A single event (the latest) is taken per device.
 AlertInfo
 | where Timestamp > ago(180d)
